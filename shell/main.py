@@ -44,16 +44,7 @@ def pipe_cmds(query):
         ab = os.fork()
         if ab:
             childs.append(ab)
-        else:
-            parent = False
-            if ev % 2 != 0:
-                # closing stdout
-                os.close(1)
-                write = os.dup(w)
-                for a in (r,w):
-                    os.close(a)
-
-                sys.stdout = os.fdopen(write, "w")
+           sys.stdout = os.fdopen(write, "w")
                 fd = sys.stdout.fileno()
                 os.set_inheritable(fd, True)
             else:
