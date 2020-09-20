@@ -88,3 +88,10 @@ while True:
                 for fd in (pw, pr):
                     os.close(fd)
                 path(pipeCommand2)
+            if '&' in userInput: # To run in background
+                userInput = userInput.split('&')[0]
+                args = userInput.split()
+
+            if '>' in userInput:     #If > in input, send to
+                #redirect method for output redirection
+                redirect('>', userInput)
