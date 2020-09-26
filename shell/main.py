@@ -3,95 +3,58 @@ import os
 import re
 import sys
 
-def path(args):
+def exe(args): #exec
     for dir in re.split(":", os.environ['PATH']): # try each directory in the path
         program = "%s/%s" % (dir, args[0])
-        #os.write(1, ("Child:  ...trying to exec %s\n" % program).encode())
         try:
-            os.execve(program, args, os.environ) # try to exec program
+            os.execve(program, args, os.environ) # try to execute program
         except FileNotFoundError:
             pass
-    sys.exit(1)                 # terminate with error
-def redirect(direction, userInput):
-    userInput = userInput.split(direction)    #Split user input by direction sign
-    if direction == '>':                      #If '>' redirect output into file
-        os.close(1)
-        sys.stdout = open(userInput[1].strip(), "w")  #open and set to write
-        os.set_inheritable(1, True)
-        path(userInput[0].split())
-    else:
-        os.close(0)                       #Redirect input
-        sys.stdin = open(userInput[1].strip(), 'r')   #open and set to read
-        os.set_inheritable(0, True)
-        path(userInput[0].split())
-
-print("123")
-while True:
-    if 'PS1' in os.environ:  #If PS1 defined, use it
-        os.write(1, (os.environ['PS1']).encode())
-    else:
-        os.write(1, ('$$ ').encode())   #If not, go to default
-    try:
-        userInput = input()             #Get user input
-        print("EOF")
-    except EOFError:
-        #print("EOF")
+        os.write(2, ("Command %s not found. Try again.\n" % args[0]).encode())
         sys.exit(1)
 
-    if userInput == "": # Empty input, will prompt again
-        continue
-    if 'exit' in userInput: # Terminates shell
-        break
-    if 'cd' in userInput: # Change directory
-        if '..' in userInput:
-            changeDir = '..'
-        else:
-            changeDir = userInput.split('cd')[1].strip()
-        try:
-            os.chdir(changeDir)
-        except FileNotFoundError:
-            pass
-        continue
-    pid = os.getpid()
-    #os.write(1, ("About to fork (pid:%d)\n" % pid).encode())
-    rc = os.fork()
-    if rc < 0:
-        #os.write(2, ("fork failed, returning %d\n" % rc).encode())
+
+def run_cmd(command):
+    rc = os.fork()      #create child process
+    args = command.copy()#copies the commands to the child
+
+    if rc < 0:#fork forked up
+        os.write(1, ("fork failed, returning %d\n" % rc).encode())#inform user of error that occured
         sys.exit(1)
-    elif rc == 0:                   # child
-        #os.write(1, ("Child: My pid==%d.  Parent's pid=%d\n" %(os.getpid(), pid)).encode())
-        args = userInput.split()
+    #continue checking for commands if the fork did not fail
+    if '&' in args:
+        args.remove('&')#remove & and continue the process
+    if rc == 0:#child running
+        if '>' in args:#redirect output
+            os.close(1)#close current write
+            os.open(args[-1], os.O_CREAT | os.O_WRONLY);#opens output file to write in
+            os.set_inheritable(1, True)#allows child to inherit
+            newArg = args[0:args.index(">")]#updates arguments to get the cmd we need to run
+            exe(newArg)
+        elif '<' in args:#redirect input
+            os.close(0)#close current read
+            os.open(args[-1], os.O_RDONLY);#opens input to read from
+            os.set_inheritable(0, True)#allows child to inherit
+            newArg = args[0:args.index("<")]#updates arguments to get the cmd we need to run
+            exe(newArg)
+        elif '/' in args[0]:
+            prog = args[0]#get program path
+            try:
+                os.execve(prog,args,os.environ)#attempt running program at given path
+            except FileNotFoundError:
+                os.write(1,("File not found at %s\n" % prog).encode())#give user failure
+        elif '|' in args:
+            writeCommands = args[0:args.index("|")]
+            readCommands = args[args.index("|") + 1:]
+            pr, pw = os.pipe()
+        #no command runs so just run cmd givin
+        exe(args)
+    #        if "ls" in args:
+    #            items = os.listdir(os.getcwd())#lists current items in current dir
+    #            for i in range(len(items)):
+    #                os.write(1,(items[i]+ "\t").encode())
+    #            os.write(1,("\n").encode())
+    elif not '&' in command:
+        childPidCode = os.wait()#wait and get child pid with return code
 
-        if "|" in userInput: # Piping command
-            pipe = userInput.split("|")
-            pipeCommand1= pipe[0].split()
-            pipeCommand2 = pipe[1].split()
-            pr, pw = os.pipe()  # file descriptors pr, pw for reading and writing
-            for f in (pr, pw):
-                os.set_inheritable(f, True)
-            pipeFork = os.fork()
-            if pipeFork < 0:  # fork failed
-                #os.write(2, ('Fork failed').encode())
-                sys.exit(1)
-            if pipeFork == 0: # child - will write to pipe
-                os.close(1) # redirect child's stdout
-                os.dup(pw)
-                os.set_inheritable(1, True)
 
-                for fd in (pr, pw):
-                    os.close(fd)
-                path(pipeCommand1)
-            else: # parent (forked ok)
-                os.close(0)
-                os.dup(pr)
-                os.set_inheritable(0, True)
-                for fd in (pw, pr):
-                    os.close(fd)
-                path(pipeCommand2)
-            if '&' in userInput: # To run in background
-                userInput = userInput.split('&')[0]
-                args = userInput.split()
-
-            if '>' in userInput:     #If > in input, send to
-                #redirect method for output redirection
-                redirect('>', userInput)
