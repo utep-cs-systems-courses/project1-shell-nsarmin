@@ -57,4 +57,37 @@ def run_cmd(command):
     elif not '&' in command:
         childPidCode = os.wait()#wait and get child pid with return code
 
+while 1: #keep running our mini shell untill forced exit
+    pid = os.getpid()
+    if 'PS1' in os.environ: #use the ps1 promt
+        os.write(1, (os.environ['PS1']).encode())
+        try:
+            command = [str(n) for n in input().split()]
+        except EOFError:    #catch error
+            sys.exit(1)
+    else:
+        os.write(1, ('$>> ').encode()) #if ps1 is not present use $>>
+        try:
+            command = [str(n) for n in input().split()]
+        except EOFError:    #if err occurs then end prog
+            sys.exit(1)
+
+    if 'cd' in command:
+        try:#if cd in comand try to change directory
+            os.chdir(command[1])
+        except FileNotFoundError:
+            os.write(1, ("File not found").encode())
+            os.write(1,("\n").encode())#newline
+            continue#restart shell
+        os.write(1,("\n").encode())#newline
+        continue#restart shell
+
+
+    if 'exit' in command:
+        sys.exit(1)
+
+    if len(command) > 0:#if there is a command that is not cd or exit run it
+        run_cmd(command)
+
+
 
