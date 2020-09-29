@@ -15,23 +15,23 @@ def exe(args): #exec
 
 
 def run_cmd(command):
-    rc = os.fork()      #create child process
+    rc = os.fork()      #create child process. call fork because keep running copies of the same program
     args = command.copy()#copies the commands to the child
 
-    if rc < 0:#fork forked up
+    if rc < 0:#fork failed;exit
         os.write(1, ("fork failed, returning %d\n" % rc).encode())#inform user of error that occured
         sys.exit(1)
     #continue checking for commands if the fork did not fail
     if '&' in args:
         args.remove('&')#remove & and continue the process
     if rc == 0:#child running
-        if '>' in args:#redirect output
+        if '>' in args:#redirect output-  the standard input (file descriptor 1)
             os.close(1)#close current write
-            os.open(args[-1], os.O_CREAT | os.O_WRONLY);#opens output file to write in
+            os.open(args[-1], os.O_CREAT | os.O_WRONLY);#opens output file to write in #connecting
             os.set_inheritable(1, True)#allows child to inherit
             newArg = args[0:args.index(">")]#updates arguments to get the cmd we need to run
             exe(newArg)
-        elif '<' in args:#redirect input
+        elif '<' in args:#redirect input - the standard input (file descriptor 0)
             os.close(0)#close current read
             os.open(args[-1], os.O_RDONLY);#opens input to read from
             os.set_inheritable(0, True)#allows child to inherit
@@ -47,7 +47,7 @@ def run_cmd(command):
             writeCommands = args[0:args.index("|")]
             readCommands = args[args.index("|") + 1:]
             pr, pw = os.pipe()
-        #no command runs so just run cmd givin
+        #no command runs so just run cmd giving
         exe(args)
     #        if "ls" in args:
     #            items = os.listdir(os.getcwd())#lists current items in current dir
